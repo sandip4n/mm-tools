@@ -119,8 +119,8 @@ TRACEPOINT_PROBE(sched, sched_migrate_task)
 
 parser = argparse.ArgumentParser(description="Trace page and task migrations", formatter_class=argparse.RawDescriptionHelpFormatter)
 group = parser.add_mutually_exclusive_group(required=True)
-group.add_argument("-a", action="store_true", default=False, help="capture activity across system")
-group.add_argument("-p", type=str, dest="target", metavar="PROG [ARGS]", help="capture actvity for a process")
+group.add_argument("-a", action="store_true", default=False, help="capture migrations across the system")
+group.add_argument("-p", type=str, dest="progpath", metavar="PATH [ARGS]", help="capture migrations for a given program")
 args = parser.parse_args()
 
 b = BPF(text=bpf_text)
