@@ -28,6 +28,7 @@ struct page_migrate_data_t {
     unsigned long pfn;
     int orig_node;
     int dest_node;
+    unsigned long ts;
     char comm[TASK_COMM_LEN];
 };
 
@@ -35,6 +36,7 @@ struct task_migrate_data_t {
     unsigned int pid;
     int orig_node;
     int dest_node;
+    unsigned long ts;
     char comm[TASK_COMM_LEN];
 };
 
@@ -83,6 +85,7 @@ int trace__migrate_misplaced_page(struct pt_regs *regs)
     data.orig_node = __page_to_node(page);
     data.dest_node = PT_REGS_PARM3(regs);
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
+    data.ts = bpf_ktime_get_ns();
     page_events.perf_submit(regs, &data, sizeof(data));
 
     return 0;
@@ -106,6 +109,7 @@ TRACEPOINT_PROBE(sched, sched_migrate_task)
     if (data.orig_node >= 0 && data.dest_node >= 0 &&
         data.orig_node != data.dest_node) {
         bpf_get_current_comm(&data.comm, sizeof(data.comm));
+        data.ts = bpf_ktime_get_ns();
         task_events.perf_submit(args, &data, sizeof(data));
     }
 
@@ -134,14 +138,14 @@ for c in cpus:
 
 def print_page_event(cpu, data, size):
     event = b["page_events"].event(data)
-    print("%-14.14s pid %-6s page with pfn %016lx migrated from node %s to %s" % (
-            event.comm.decode("utf-8", "replace"),
+    print("%016lu %-14.14s pid %-6s page with pfn %016lx migrated from node %s to %s" % (
+            event.ts, event.comm.decode("utf-8", "replace"),
             event.pid, event.pfn, event.orig_node, event.dest_node))
 
 def print_task_event(cpu, data, size):
     event = b["task_events"].event(data)
-    print("%-14.14s pid %-6s task migrated from node %s to %s" % (
-            event.comm.decode("utf-8", "replace"),
+    print("%016lu %-14.14s pid %-6s task migrated from node %s to %s" % (
+            event.ts, event.comm.decode("utf-8", "replace"),
             event.pid, event.orig_node, event.dest_node))
 
 b["task_events"].open_perf_buffer(print_task_event, page_cnt=512)
