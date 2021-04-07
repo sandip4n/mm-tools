@@ -6,6 +6,7 @@ import argparse
 import ctypes
 import os
 import re
+import subprocess
 import time
 
 bpf_text = """
@@ -13,6 +14,7 @@ bpf_text = """
 #include <linux/sched.h>
 #include <uapi/linux/ptrace.h>
 
+BPF_ARRAY(pidmap, unsigned int);
 BPF_HASH(cpumap, unsigned int, unsigned int);
 BPF_PERF_OUTPUT(page_events);
 BPF_PERF_OUTPUT(task_events);
@@ -46,11 +48,24 @@ static inline int __cpu_to_node(int cpu)
     return *node;
 }
 
+static inline int __filter_pid(unsigned int pid)
+{
+    unsigned int zero = 0, *val;
+    val = pidmap.lookup(&zero);
+    return !(val && pid == *val);
+}
+
 int trace__migrate_misplaced_page(struct pt_regs *regs)
 {
     struct page_migrate_data_t data = {};
+    struct task_struct *task;
 
     data.pid = bpf_get_current_pid_tgid() >> 32;
+    task = (struct task_struct *) bpf_get_current_task();
+
+    if (__filter_pid(data.pid) && __filter_pid(task->real_parent->tgid))
+        return 0;
+
     data.orig_node = __page_to_node((struct page *) PT_REGS_PARM1(regs));
     data.dest_node = PT_REGS_PARM3(regs);
     bpf_get_current_comm(&data.comm, sizeof(data.comm));
@@ -62,8 +77,14 @@ int trace__migrate_misplaced_page(struct pt_regs *regs)
 TRACEPOINT_PROBE(sched, sched_migrate_task)
 {
     struct task_migrate_data_t data = {};
+    struct task_struct *task;
 
     data.pid = args->pid;
+    task = (struct task_struct *) bpf_get_current_task();
+
+    if (__filter_pid(data.pid) && __filter_pid(task->real_parent->tgid))
+        return 0;
+
     data.orig_node = __cpu_to_node(args->orig_cpu);
     data.dest_node = __cpu_to_node(args->dest_cpu);
 
@@ -77,6 +98,12 @@ TRACEPOINT_PROBE(sched, sched_migrate_task)
     return 0;
 }
 """
+
+parser = argparse.ArgumentParser(description="Trace page and task migrations", formatter_class=argparse.RawDescriptionHelpFormatter)
+group = parser.add_mutually_exclusive_group(required=True)
+group.add_argument("-a", action="store_true", default=False, help="capture activity across system")
+group.add_argument("-p", type=str, dest="target", metavar="PROG [ARGS]", help="capture actvity for a process")
+args = parser.parse_args()
 
 b = BPF(text=bpf_text)
 b.attach_kprobe(event="migrate_misplaced_page", fn_name="trace__migrate_misplaced_page")
@@ -106,9 +133,18 @@ def print_task_event(cpu, data, size):
 b["task_events"].open_perf_buffer(print_task_event, page_cnt=512)
 b["page_events"].open_perf_buffer(print_page_event, page_cnt=512)
 
+if args.target:
+    target = subprocess.Popen(args.target.split(), shell=False, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    b["pidmap"][ctypes.c_uint(0)] = ctypes.c_uint(target.pid)
+
 while True:
     try:
+        target.communicate()
         b.perf_buffer_poll()
+        if not target.poll() is None:
+            exit()
         time.sleep(0.5)
     except KeyboardInterrupt:
+        if args.target:
+            target.kill()
         exit()
