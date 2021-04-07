@@ -7,7 +7,6 @@ import ctypes
 import os
 import re
 import subprocess
-import time
 
 bpf_text = """
 #include <linux/mm.h>
@@ -148,21 +147,19 @@ def print_task_event(cpu, data, size):
             event.ts, event.comm.decode("utf-8", "replace"),
             event.pid, event.orig_node, event.dest_node))
 
-b["task_events"].open_perf_buffer(print_task_event, page_cnt=512)
-b["page_events"].open_perf_buffer(print_page_event, page_cnt=512)
+b["task_events"].open_perf_buffer(print_task_event, page_cnt=64)
+b["page_events"].open_perf_buffer(print_page_event, page_cnt=64)
 
-if args.target:
-    target = subprocess.Popen(args.target.split(), shell=False, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    b["pidmap"][ctypes.c_uint(0)] = ctypes.c_uint(target.pid)
+if args.progpath:
+    p = subprocess.Popen(args.progpath.split(), shell=False, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    b["pidmap"][ctypes.c_uint(0)] = ctypes.c_uint(p.pid)
 
 while True:
     try:
-        target.communicate()
-        b.perf_buffer_poll()
-        if not target.poll() is None:
-            exit()
-        time.sleep(0.5)
+        b.perf_buffer_poll(500)
+        if args.progpath is not None and p.poll() is not None:
+            break
     except KeyboardInterrupt:
-        if args.target:
-            target.kill()
-        exit()
+        if args.progpath:
+            p.kill()
+        break
