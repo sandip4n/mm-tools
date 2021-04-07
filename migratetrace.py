@@ -8,7 +8,7 @@ import os
 import re
 import time
 
-prog = """
+bpf_text = """
 #include <linux/mm.h>
 #include <linux/sched.h>
 #include <uapi/linux/ptrace.h>
@@ -78,7 +78,7 @@ TRACEPOINT_PROBE(sched, sched_migrate_task)
 }
 """
 
-b = BPF(text=prog)
+b = BPF(text=bpf_text)
 b.attach_kprobe(event="migrate_misplaced_page", fn_name="trace__migrate_misplaced_page")
 
 # determine node mapping for cpus
