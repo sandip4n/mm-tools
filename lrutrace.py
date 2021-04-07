@@ -5,7 +5,7 @@ from bcc import BPF
 import argparse
 import time
 
-prog = """
+bpf_text = """
 #include <linux/mmzone.h>
 #include <linux/sched.h>
 #include <uapi/linux/ptrace.h>
@@ -71,7 +71,7 @@ args = parser.parse_args()
 if not any(vars(args).values()):
     parser.error("one of the arguments --anon-active --anon-inactive --file-active --file-inactive is required")
 
-b = BPF(text=prog)
+b = BPF(text=bpf_text)
 b.attach_kprobe(event="__mod_lruvec_state", fn_name="trace__mod_lruvec_state")
 stack_traces = b["stack_traces"]
 
