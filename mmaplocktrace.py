@@ -167,6 +167,9 @@ group.add_argument("-p", type=str, dest="progpath", metavar="PATH [ARGS]",
                    help="capture migrations for a given program")
 args = parser.parse_args()
 
+if os.geteuid() != 0:
+    exit("You need root privileges to run this script")
+
 def print_mmap_lock_release_event(cpu, data, size):
     event = ctypes.cast(data, ctypes.POINTER(mmap_lock_data_t)).contents
     print("%-16.16s %8s %8s %8s %10s %24.3f %24.3f" % (
