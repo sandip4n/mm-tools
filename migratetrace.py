@@ -145,13 +145,13 @@ for c in cpus:
 
 def print_page_event(cpu, data, size):
     event = b["page_events"].event(data)
-    print("%016lu %-14.14s pid %-6s page with pfn %016lx migrated from node %s to %s" % (
+    print("%-16s %-16.16s pid %-6s page with pfn %016lx migrated from node %s to %s" % (
             event.ts, event.comm.decode("utf-8", "replace"),
             event.pid, event.pfn, event.orig_node, event.dest_node))
 
 def print_task_event(cpu, data, size):
     event = b["task_events"].event(data)
-    print("%016lu %-14.14s pid %-6s task migrated from node %s to %s" % (
+    print("%-16s %-16.16s pid %-6s task migrated from node %s to %s" % (
             event.ts, event.comm.decode("utf-8", "replace"),
             event.pid, event.orig_node, event.dest_node))
 
