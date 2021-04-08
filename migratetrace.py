@@ -71,15 +71,19 @@ int trace__migrate_misplaced_page(struct pt_regs *regs)
 {
     struct page_migrate_data_t data = {};
     struct task_struct *task;
+    unsigned long pid_tgid;
     struct page *page;
 
-    page = (struct page *) PT_REGS_PARM1(regs);
-    data.pid = bpf_get_current_pid_tgid() >> 32;
+    pid_tgid = bpf_get_current_pid_tgid();
+    data.pid = pid_tgid >> 32;
     task = (struct task_struct *) bpf_get_current_task();
 
-    if (__filter_pid(data.pid) && __filter_pid(task->real_parent->tgid))
+    if (__filter_pid(data.pid) &&
+        __filter_pid(pid_tgid) &&
+        __filter_pid(task->real_parent->tgid))
         return 0;
 
+    page = (struct page *) PT_REGS_PARM1(regs);
     data.pfn = __page_to_frame(page);
     data.orig_node = __page_to_node(page);
     data.dest_node = PT_REGS_PARM3(regs);
@@ -94,11 +98,15 @@ TRACEPOINT_PROBE(sched, sched_migrate_task)
 {
     struct task_migrate_data_t data = {};
     struct task_struct *task;
+    unsigned long pid_tgid;
 
-    data.pid = args->pid;
+    pid_tgid = bpf_get_current_pid_tgid();
+    data.pid = pid_tgid >> 32;
     task = (struct task_struct *) bpf_get_current_task();
 
-    if (__filter_pid(data.pid) && __filter_pid(task->real_parent->tgid))
+    if (__filter_pid(data.pid) &&
+        __filter_pid(pid_tgid) &&
+        __filter_pid(task->real_parent->tgid))
         return 0;
 
     data.orig_node = __cpu_to_node(args->orig_cpu);
