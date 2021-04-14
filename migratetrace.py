@@ -130,6 +130,9 @@ group.add_argument("-a", action="store_true", default=False, help="capture migra
 group.add_argument("-p", type=str, dest="progpath", metavar="PATH [ARGS]", help="capture migrations for a given program")
 args = parser.parse_args()
 
+if os.geteuid() != 0:
+    exit("You need root privileges to run this script")
+
 b = BPF(text=bpf_text)
 b.attach_kprobe(event="migrate_misplaced_page", fn_name="trace__migrate_misplaced_page")
 
