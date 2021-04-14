@@ -99,7 +99,6 @@ TRACEPOINT_PROBE(mmap_lock, mmap_lock_acquire_returned)
         if (args->success) {
             prev->ts_last_acquire = bpf_ktime_get_ns();
             prev->lat_acquire += prev->ts_last_acquire - prev->ts_last_start;
-            prev->lat_acquire /= prev->n_attempts;
             mmap_lock_map.update(&prev->key, prev);
         }
     }
