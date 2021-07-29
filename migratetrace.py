@@ -56,8 +56,9 @@ static inline int __cpu_to_node(int cpu)
 
 static inline unsigned long __page_to_frame(struct page *page)
 {
+    const struct page *vmemmap = (struct page *) 0xc00c000000000000UL;
     /* vmemmap is virtually contiguous */
-    return (unsigned long) ((unsigned long) page - 0xc00c000000000000UL);
+    return (unsigned long) (page - vmemmap);
 }
 
 static inline int __filter_pid(unsigned int pid)
